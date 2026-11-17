@@ -2,7 +2,7 @@ import { THREE, G, BOX, clamp, lerp, dist, angDiff, rrand, rpick, rint, textSpri
 import { VT } from './models.js';
 import { W, PL, buildWorld, collide, inside, nearestNode, nodesNear, roadAt, district, BOUNDS, edge, edgeNear, route, pave, sigState, updateSignals } from './world.js';
 import { spawnVeh, collideVehicles, updateAI, toLane, lanePose } from './vehicles.js';
-import { A, audioInit, sfxHorn, sfxCrash, sfxCash, sfxWhistle, audioUpdate, radioNext, radioName, speakPhrase } from './audio.js';
+import { A, audioInit, audioUnlock, sfxHorn, sfxCrash, sfxCash, sfxWhistle, audioUpdate, radioNext, radioName, speakPhrase } from './audio.js';
 import { pickHwindi, pickBanter, pickPax, ambientFor, PAX_FUNNY } from './phrases.js';
 
 const $ = id => document.getElementById(id);
@@ -11,10 +11,11 @@ const QUAL = {
   med: { traffic: 16, peds: 26, pr: 1.5, far: 560, lod: 80, prop: 230, aa: false, shadow: 1024 },
   high: { traffic: 26, peds: 40, pr: 2, far: 820, lod: 110, prop: 320, aa: true, shadow: 2048 },
 };
-const touchDev = matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const touchDev = matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || !!(typeof window !== 'undefined' && window.Capacitor);
 
 // ------------------------------------------------------------------ input
-const keys = {}, pressed = new Set(), tAct = new Set(), tHeld = new Set(), joy = { x: 0, y: 0, id: -1 };
+const keys = {}, pressed = new Set(), tAct = new Set(), tHeld = new Set(), joy = { x: 0, y: 0, id: -1, active: false };
 addEventListener('keydown', e => { if (!keys[e.code]) pressed.add(e.code); keys[e.code] = 1; if (/^(Space|Arrow|Tab)/.test(e.code)) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.code] = 0; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = 0; });
@@ -24,22 +25,40 @@ function readInput() {
   const i = G.in;
   i.thr = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
   i.steer = (keys.KeyA || keys.ArrowLeft ? 1 : 0) - (keys.KeyD || keys.ArrowRight ? 1 : 0);
-  i.hb = keys.Space || tHeld.has('HB') ? 1 : 0; i.run = keys.ShiftLeft || keys.ShiftRight ? 1 : 0;
-  if (joy.id >= 0) { i.thr = clamp(-joy.y * 1.3, -1, 1); i.steer = clamp(-joy.x * 1.3, -1, 1); if (Math.abs(i.thr) < .15) i.thr = 0; if (Math.abs(i.steer) < .12) i.steer = 0; }
+  i.hb = keys.Space || tHeld.has('HB') ? 1 : 0; i.run = keys.ShiftLeft || keys.ShiftRight || tHeld.has('RUN') ? 1 : 0;
+  if (joy.active) { i.thr = clamp(-joy.y * 1.35, -1, 1); i.steer = clamp(-joy.x * 1.35, -1, 1); if (Math.abs(i.thr) < .12) i.thr = 0; if (Math.abs(i.steer) < .12) i.steer = 0; }
 }
 function initTouch() {
   $('touch').classList.remove('hide');
   const j = $('joy'), k = $('knob');
-  const mv = e => { const r = j.getBoundingClientRect(), R = r.width / 2; let x = (e.clientX - r.left - R) / R, y = (e.clientY - r.top - R) / R; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } joy.x = x; joy.y = y; k.style.transform = `translate(${x * R * .6}px,${y * R * .6}px)`; };
-  j.addEventListener('pointerdown', e => { joy.id = e.pointerId; try { j.setPointerCapture(e.pointerId); } catch (err) { } mv(e); e.preventDefault(); });
-  j.addEventListener('pointermove', e => { if (e.pointerId === joy.id) mv(e); });
-  const up = e => { if (e.pointerId === joy.id) { joy.id = -1; joy.x = joy.y = 0; k.style.transform = ''; } };
-  j.addEventListener('pointerup', up); j.addEventListener('pointercancel', up);
+  const setStick = (clientX, clientY) => {
+    const r = j.getBoundingClientRect(), R = Math.max(1, r.width / 2);
+    let x = (clientX - r.left - R) / R, y = (clientY - r.top - R) / R;
+    const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+    joy.x = x; joy.y = y; joy.active = true;
+    k.style.transform = `translate(${x * R * .55}px,${y * R * .55}px)`;
+  };
+  const clearStick = () => { joy.id = -1; joy.active = false; joy.x = joy.y = 0; k.style.transform = ''; };
+  const pt = e => (e.changedTouches && e.changedTouches[0]) || e;
+  const down = e => { const t = pt(e); joy.id = t.pointerId != null ? t.pointerId : (t.identifier != null ? t.identifier : 1); setStick(t.clientX, t.clientY); audioUnlock(); e.preventDefault(); };
+  const move = e => { if (!joy.active) return; const t = pt(e); if (t.pointerId != null && joy.id !== -1 && t.pointerId !== joy.id) return; setStick(t.clientX, t.clientY); e.preventDefault(); };
+  const up = e => { clearStick(); e.preventDefault(); };
+  j.addEventListener('pointerdown', e => { try { j.setPointerCapture(e.pointerId); } catch (err) { } down(e); }, { passive: false });
+  j.addEventListener('pointermove', move, { passive: false });
+  j.addEventListener('pointerup', up, { passive: false });
+  j.addEventListener('pointercancel', up, { passive: false });
+  j.addEventListener('touchstart', down, { passive: false });
+  j.addEventListener('touchmove', move, { passive: false });
+  j.addEventListener('touchend', up, { passive: false });
+  j.addEventListener('touchcancel', up, { passive: false });
   document.querySelectorAll('[data-act]').forEach(b => {
     const n = b.dataset.act;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); if (n === 'HB') tHeld.add(n); else tAct.add(n); b.classList.add('on'); });
+    const on = e => { e.preventDefault(); audioUnlock(); if (n === 'HB' || n === 'RUN') tHeld.add(n); else tAct.add(n); b.classList.add('on'); };
     const off = () => { tHeld.delete(n); b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on, { passive: false });
+    b.addEventListener('touchstart', on, { passive: false });
     b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('pointerleave', off);
+    b.addEventListener('touchend', off); b.addEventListener('touchcancel', off);
   });
 }
 
@@ -66,9 +85,13 @@ function hurt(n) { const p = G.player; if (p.hp <= 0) return; p.hp -= n; G.hurtF
 // Ngwere — built from rounded shapes with jointed hips, knees, shoulders and elbows:
 // black hoodie with yellow sleeve stripes and chest script, white tee hem, cargo pants, flag cap, locs, backpack, yellow-and-black high-tops
 function makePlayer() {
-  const g = new THREE.Group(), mats = {}, mat = c => mats[c] || (mats[c] = new THREE.MeshLambertMaterial({ color: c, emissive: c === 0x6a4530 ? 0x2a1a10 : 0x050506 }));
-  const add = (geo, m, x, y, z, parent) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); o.castShadow = true; (parent || g).add(o); return o; };
-  const cap = (r, len, sx = 1, sz = 1) => new THREE.CapsuleGeometry(r, len, 5, 12).scale(sx, 1, sz), box = (w, h, d) => new THREE.BoxGeometry(w, h, d), sph = (r, sx = 1, sy = 1, sz = 1) => new THREE.SphereGeometry(r, 18, 14).scale(sx, sy, sz);
+  const g = new THREE.Group(), mats = {};
+  const mat = c => mats[c] || (mats[c] = new THREE.MeshStandardMaterial({
+    color: c, roughness: c === 0x6a4530 ? .62 : .78, metalness: 0.04,
+    emissive: c === 0x6a4530 ? 0x1a0f0a : 0x000000, emissiveIntensity: c === 0x6a4530 ? .12 : 0,
+  }));
+  const add = (geo, m, x, y, z, parent) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; (parent || g).add(o); return o; };
+  const cap = (r, len, sx = 1, sz = 1) => new THREE.CapsuleGeometry(r, len, 6, 14).scale(sx, 1, sz), box = (w, h, d) => new THREE.BoxGeometry(w, h, d), sph = (r, sx = 1, sy = 1, sz = 1) => new THREE.SphereGeometry(r, 22, 16).scale(sx, sy, sz);
   const grp = (x, y, z, parent) => { const o = new THREE.Group(); o.position.set(x, y, z); (parent || g).add(o); return o; };
   const BLK = 0x18181b, YEL = 0xf2b90f, SK = 0x6a4530, LOC = 0x19110b, PANT = 0x1d1d20;
   const tex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
@@ -80,7 +103,7 @@ function makePlayer() {
     x.strokeStyle = 'rgba(30,15,8,.55)'; x.lineWidth = 3; x.beginPath(); x.moveTo(cx - 4, 112); x.lineTo(cx - 8, 140); x.quadraticCurveTo(cx, 147, cx + 8, 140); x.stroke(); x.fillStyle = 'rgba(20,10,5,.6)'; x.beginPath(); x.ellipse(cx - 6, 142, 3, 2, 0, 0, 6.3); x.ellipse(cx + 6, 142, 3, 2, 0, 0, 6.3); x.fill();
     x.fillStyle = '#4a2a22'; x.beginPath(); x.ellipse(cx, 166, 17, 6.5, 0, 0, 6.3); x.fill(); x.strokeStyle = '#2e1812'; x.lineWidth = 2; x.beginPath(); x.moveTo(cx - 16, 165); x.quadraticCurveTo(cx, 169, cx + 16, 165); x.stroke();
     x.fillStyle = 'rgba(15,8,4,.35)'; x.fillRect(cx - 40, 178, 80, 14); });
-  const head = grp(0, 1.6, 0); add(new THREE.SphereGeometry(.118, 24, 18).scale(.92, 1.14, 1), new THREE.MeshLambertMaterial({ map: face, emissive: 0xffffff, emissiveMap: face, emissiveIntensity: .28 }), 0, 0, 0, head);
+  const head = grp(0, 1.6, 0); add(new THREE.SphereGeometry(.118, 28, 22).scale(.92, 1.14, 1), new THREE.MeshStandardMaterial({ map: face, roughness: .55, metalness: .02, emissive: 0xffffff, emissiveMap: face, emissiveIntensity: .18 }), 0, 0, 0, head);
   for (const s of [-1, 1]) add(sph(.03, .5, 1, .8), SK, s * .108, -.005, .0, head);
   add(new THREE.CylinderGeometry(.05, .058, .1, 12), SK, 0, 1.47, 0);
   // cap, brim and flag patch
@@ -114,9 +137,24 @@ function makePlayer() {
 }
 function updateFoot(dt) {
   const p = G.player, i = G.in;
-  if (G.vend.active && Math.abs(i.thr) > .2) stopVend();
-  p.h += i.steer * 2.8 * dt;
-  const run = i.run || (joy.id >= 0 && Math.abs(i.thr) > .9), sp = i.thr > 0 ? i.thr * (run ? 6.6 : 3.6) : i.thr * 1.8; p.spd = Math.abs(sp);
+  let sp = 0;
+  // Mobile stick: camera-relative walk (push toward where you look). Keyboard: tank turn + forward.
+  if (joy.active && Math.hypot(joy.x, joy.y) > .1) {
+    const sx = Math.sin(G.camH), cz = Math.cos(G.camH), rx = cz, rz = -sx;
+    const jx = joy.x, jy = -joy.y; // stick up = forward along camera
+    let mx = rx * jx + sx * jy, mz = rz * jx + cz * jy;
+    const mag = Math.hypot(mx, mz) || 1; mx /= mag; mz /= mag;
+    p.h = Math.atan2(mx, mz);
+    const run = i.run || mag > .82;
+    sp = mag * (run ? 6.8 : 3.8);
+    if (G.vend.active && mag > .2) stopVend();
+  } else {
+    if (G.vend.active && Math.abs(i.thr) > .2) stopVend();
+    p.h += i.steer * 2.8 * dt;
+    const run = !!i.run;
+    sp = i.thr > 0 ? i.thr * (run ? 6.6 : 3.6) : i.thr * 1.8;
+  }
+  p.spd = Math.abs(sp);
   p.x = clamp(p.x + Math.sin(p.h) * sp * dt, BOUNDS.x0, BOUNDS.x1); p.z = clamp(p.z + Math.cos(p.h) * sp * dt, BOUNDS.z0, BOUNDS.z1);
   collide(p, .35); p.hitCd -= dt;
   for (const v of G.vehicles) {
@@ -127,12 +165,13 @@ function updateFoot(dt) {
       if (d < m && d > .001) { p.x = cx + (p.x - cx) / d * m; p.z = cz + (p.z - cz) / d * m; if (Math.abs(v.speed) > 4 && p.hitCd <= 0) { hurt((Math.abs(v.speed) - 3) * 4); p.hitCd = 1; G.shake = .8; sfxCrash(.3); } }
     }
   }
-  p.anim += sp * dt * 2.7; const sw = Math.sin(p.anim) * .75 * Math.min(1, p.spd / 3);
-  const P = p.parts, amp = Math.min(1, p.spd / 3), ph = p.anim;
-  P.legL.rotation.x = sw; P.legR.rotation.x = -sw; P.kL.rotation.x = Math.max(0, Math.sin(ph + 1.1)) * 1.15 * amp; P.kR.rotation.x = Math.max(0, Math.sin(ph + 1.1 + Math.PI)) * 1.15 * amp;
-  P.armL.rotation.x = -sw * .8; P.armR.rotation.x = sw * .8; P.eL.rotation.x = -(.18 + Math.max(0, -Math.sin(ph)) * .7 * amp + (p.spd > 5 ? .7 : 0)); P.eR.rotation.x = -(.18 + Math.max(0, Math.sin(ph)) * .7 * amp + (p.spd > 5 ? .7 : 0));
-  P.armL.rotation.z = -.07; P.armR.rotation.z = .07; P.head.rotation.y = clamp(-G.in.steer * .35, -.5, .5);
-  p.mesh.position.set(p.x, .1 + Math.abs(Math.sin(ph)) * .025 * amp, p.z); p.mesh.rotation.y = p.h; p.mesh.rotation.x = p.spd > 5 ? .1 : 0;
+  p.anim += Math.max(.35, Math.abs(sp)) * dt * (p.spd > .05 ? 2.9 : 0);
+  const sw = Math.sin(p.anim) * .85 * Math.min(1, p.spd / 2.6);
+  const P = p.parts, amp = Math.min(1, p.spd / 2.6), ph = p.anim;
+  P.legL.rotation.x = sw; P.legR.rotation.x = -sw; P.kL.rotation.x = Math.max(0, Math.sin(ph + 1.1)) * 1.25 * amp; P.kR.rotation.x = Math.max(0, Math.sin(ph + 1.1 + Math.PI)) * 1.25 * amp;
+  P.armL.rotation.x = -sw * .9; P.armR.rotation.x = sw * .9; P.eL.rotation.x = -(.18 + Math.max(0, -Math.sin(ph)) * .75 * amp + (p.spd > 5 ? .65 : 0)); P.eR.rotation.x = -(.18 + Math.max(0, Math.sin(ph)) * .75 * amp + (p.spd > 5 ? .65 : 0));
+  P.armL.rotation.z = -.08; P.armR.rotation.z = .08; P.head.rotation.y = clamp((joy.active ? -joy.x : -i.steer) * .4, -.55, .55);
+  p.mesh.position.set(p.x, .1 + Math.abs(Math.sin(ph)) * .03 * amp, p.z); p.mesh.rotation.y = p.h; p.mesh.rotation.x = p.spd > 5 ? .12 : 0;
 }
 function tryEnter() {
   const p = G.player; let best = null, bd = 1e9;
@@ -844,7 +883,7 @@ function startGame(q, fresh) {
   G.mini = $('mini');
   $('menu').classList.add('hide'); $('hud').classList.remove('hide'); if (touchDev) initTouch();
   G.state = 'play'; updateCamera(.016);
-  if (G.story === 0) { banner('SUNSHINE CITY', 'Harare Hustle · starring Ngwere'); toast(touchDev ? 'Use the stick to move. Walk into the yellow marker to begin.' : 'WASD / arrows to move · Shift to run · walk into the yellow STORY marker to begin', 7); }
+  if (G.story === 0) { banner('SUNSHINE CITY', 'Harare Hustle · starring Ngwere'); toast(touchDev ? 'Drag the left stick to walk (camera direction). Hold RUN to sprint. Yellow marker = story.' : 'WASD / arrows to move · Shift to run · walk into the yellow STORY marker to begin', 7); }
   else toast('Welcome back to Harare. Follow the yellow S on the map, or just hustle.', 5);
 }
 addEventListener('resize', () => { if (!G.renderer) return; G.renderer.setSize(innerWidth, innerHeight); G.camera.aspect = innerWidth / innerHeight; G.camera.updateProjectionMatrix(); });
@@ -854,7 +893,7 @@ function boot() {
   G.state = 'menu';
   const sv = load(); if (sv && (sv.story > 0 || sv.money > 15)) { $('cont').classList.remove('hide'); $('cont').textContent = `Continue  (Story ${Math.min(sv.story + 1, STORY.length)}/${STORY.length} · $${sv.money})`; }
   const auto = touchDev ? ((navigator.hardwareConcurrency || 4) >= 8 ? 'med' : 'low') : 'high'; $('q').value = auto;
-  const go = fresh => { audioInit(); startGame($('q').value, fresh); };
+  const go = fresh => { audioInit(); audioUnlock(); startGame($('q').value, fresh); };
   $('play').onclick = () => go(true); $('cont').onclick = () => go(false);
   $('dialog').addEventListener('pointerdown', e => { e.preventDefault(); advanceDialog(); });
   $('bigmap').addEventListener('pointerdown', () => toggleMap());

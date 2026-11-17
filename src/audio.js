@@ -16,6 +16,13 @@ export function audioInit() {
     if (c.state === 'suspended') c.resume();
   } catch (e) { A.ctx = null; }
 }
+/** Call from every user gesture — iOS/WKWebView keeps AudioContext suspended otherwise. */
+export function audioUnlock() {
+  try {
+    if (!A.ctx) audioInit();
+    if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume();
+  } catch (e) { /* ignore */ }
+}
 function tone(f, t, dur, type, vol, dest, f2) {
   const c = A.ctx, o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0008, t + dur); o.connect(g); g.connect(dest || A.master); o.start(t); o.stop(t + dur + .02);
@@ -43,7 +50,10 @@ let _voiceBusy = 0;
  */
 export function speakPhrase(text, { shout = true } = {}) {
   if (!text) return;
+  audioUnlock();
   sfxHwindiBark();
+  // iOS speechSynthesis is late/unsynced with gameplay — keep bark + on-screen toast only
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
   try {
     const syn = window.speechSynthesis;
     if (!syn) return;
@@ -53,7 +63,7 @@ export function speakPhrase(text, { shout = true } = {}) {
     const u = new SpeechSynthesisUtterance(String(text));
     u.rate = shout ? 1.12 : 1.02;
     u.pitch = shout ? 0.85 : 1.0;
-    u.volume = 0.92;
+    u.volume = 0.85;
     const voices = syn.getVoices?.() || [];
     const prefer = voices.find(v => /en(-|_)?(ZA|GB|US|AU|IN)/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang));
     if (prefer) u.voice = prefer;
