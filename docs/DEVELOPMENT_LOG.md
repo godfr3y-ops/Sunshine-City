@@ -21,22 +21,28 @@ AI concept renders (Ngwere cinematic stills, Joina/RBZ skyline) are **art direct
 - Hwindi phrase toasts + radio stations
 - Unsigned Android APK + Sideloadly iOS IPA (CI)
 
-## Fixes shipped this milestone (playable, not mockups)
+## Fixes shipped (playable, not mockups)
 
 1. **iOS movement** — dual pointer/touch stick; camera-relative on-foot move; RUN button  
 2. **Audio** — `audioUnlock()` on every gesture; iOS TTS removed to stop desync  
 3. **Ngwere** — StandardMaterial + denser mesh + stronger walk cycle (still stylized, not AAA scan)  
 4. **Mobile HUD** — safer insets, tighter controls  
+5. **Interiors** — Flat near Copacabana + corner shop near First Street: [E] enter/exit, walk rooms, shop buy  
+6. **Cockpit cam** — [V] / CAM toggles first-person dashboard view in any vehicle  
+7. **Facades** — varied shop signs, weathering, AC hints (procedural atlases)  
+8. **Peds** — role colours (Warriors / office / casual) + hats on some NPCs  
 
 ## What the AAA brief requires next (phased)
 
 Do **not** claim these done until acceptance tests pass in-game.
 
-### Phase A — Immersion foundation (next)
-- Door enter/exit + 1–2 real interiors (apartment + shop)
-- Vehicle enter animation + basic cockpit camera for kombi + sedan
-- Texture pass on CBD blocks (unique facades, signage atlases)
-- Replace capsule pedestrians with 3–4 clothed variants
+### Phase A — Immersion foundation ✅ (v1 shipped)
+- [x] Door enter/exit + apartment + shop interiors  
+- [x] Vehicle cockpit camera (+ enter blend)  
+- [x] CBD facade/signage variety  
+- [x] Ped clothing/hat variants  
+- [ ] More interiors (bank, ZRP desk)  
+- [ ] Real mirror render targets (mobile-costly)  
 
 ### Phase B — Living Harare
 - District identity: Mbare, Avondale, Borrowdale (streamed chunks)

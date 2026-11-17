@@ -4,6 +4,7 @@ import { W, PL, buildWorld, collide, inside, nearestNode, nodesNear, roadAt, dis
 import { spawnVeh, collideVehicles, updateAI, toLane, lanePose } from './vehicles.js';
 import { A, audioInit, audioUnlock, sfxHorn, sfxCrash, sfxCash, sfxWhistle, audioUpdate, radioNext, radioName, speakPhrase } from './audio.js';
 import { pickHwindi, pickBanter, pickPax, ambientFor, PAX_FUNNY } from './phrases.js';
+import { placeDoors, enterInterior, leaveInterior, collideInterior, nearDoor, attachCockpit } from './interiors.js';
 
 const $ = id => document.getElementById(id);
 const QUAL = {
@@ -19,7 +20,7 @@ const keys = {}, pressed = new Set(), tAct = new Set(), tHeld = new Set(), joy =
 addEventListener('keydown', e => { if (!keys[e.code]) pressed.add(e.code); keys[e.code] = 1; if (/^(Space|Arrow|Tab)/.test(e.code)) e.preventDefault(); });
 addEventListener('keyup', e => { keys[e.code] = 0; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = 0; });
-const ACT = { E: ['KeyE', 'Enter'], F: ['KeyF'], J: ['KeyJ'], H: ['KeyH'], R: ['KeyR'], M: ['KeyM'], P: ['KeyP', 'Escape'] };
+const ACT = { E: ['KeyE', 'Enter'], F: ['KeyF'], J: ['KeyJ'], H: ['KeyH'], R: ['KeyR'], M: ['KeyM'], P: ['KeyP', 'Escape'], V: ['KeyV'] };
 function act(n) { for (const c of ACT[n]) if (pressed.has(c)) { pressed.delete(c); return true; } if (tAct.has(n)) { tAct.delete(n); return true; } return false; }
 function readInput() {
   const i = G.in;
@@ -156,7 +157,8 @@ function updateFoot(dt) {
   }
   p.spd = Math.abs(sp);
   p.x = clamp(p.x + Math.sin(p.h) * sp * dt, BOUNDS.x0, BOUNDS.x1); p.z = clamp(p.z + Math.cos(p.h) * sp * dt, BOUNDS.z0, BOUNDS.z1);
-  collide(p, .35); p.hitCd -= dt;
+  if (G.interior) collideInterior(p, G.interior); else collide(p, .35);
+  p.hitCd -= dt;
   for (const v of G.vehicles) {
     if (Math.abs(v.x - p.x) > 8 || Math.abs(v.z - p.z) > 8) continue;
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
@@ -185,8 +187,12 @@ function tryEnter() {
   const allowed = (v.type === 'police' && G.duty === 'police') || (v.type === 'army' && G.duty === 'army') || (v.type === 'council' && G.duty === 'council') || (v.type === 'ambulance' && G.duty === 'ems') || v === G.sv || (v.keep && !official);
   if (v.ai) { ejectDriver(v); v.ai = null; if (!allowed) addWanted(v.type === 'police' ? 2 : 1, 'Hijacking reported!'); }
   else if (official && !allowed) addWanted(v.type === 'army' ? 3 : v.type === 'police' ? 2 : 1, v.type === 'army' ? 'You stole an army truck! Military police alerted.' : 'Government vehicle stolen!');
-  stopVend(); p.veh = v; v.noRev = false; p.mesh.visible = false; G.camH = v.h;
-  if (v.t.job && !G.script) toast(`${v.t.name} — press [J] to start: ${v.t.job}`);
+  stopVend();
+  G.enterT = .55; // short enter blend
+  p.veh = v; v.noRev = false; p.mesh.visible = false; G.camH = v.h;
+  attachCockpit(v);
+  if (v.t.job && !G.script) toast(`${v.t.name} — [J] job · [V] cockpit/chase cam`, 4.5);
+  else toast(`${v.t.name} — [V] toggle cockpit view`, 3);
   if (A.station < 0 && !G.radioTouched) { G.radioTouched = true; radioNext(); toast('📻 ' + radioName() + '   ([R] to change)', 4); }
 }
 function exitVeh(force) {
@@ -194,7 +200,8 @@ function exitVeh(force) {
   if (!force && Math.abs(v.speed) > 5) { toast('Slow down first!'); return; }
   const fx = Math.sin(v.h), fz = Math.cos(v.h);
   p.x = v.x - fz * (v.t.W / 2 + 1); p.z = v.z + fx * (v.t.W / 2 + 1); p.h = v.h; collide(p, .35);
-  v.thr = 0; v.steer = 0; v.hb = 1; p.veh = null; p.mesh.visible = true; G.camH = p.h;
+  v.thr = 0; v.steer = 0; v.hb = 1; p.veh = null; p.mesh.visible = true; G.camH = p.h; G.camMode = 'chase';
+  if (v.cockpit) v.cockpit.visible = false;
 }
 function ejectDriver(v) {
   const q = G.peds.reduce((a, b) => (!a || (b.d || 0) > (a.d || 0)) ? b : a, null); if (!q) return;
@@ -202,17 +209,31 @@ function ejectDriver(v) {
 }
 
 // ------------------------------------------------------------------ pedestrians (6 instanced meshes for everybody)
-const PSKIN = [0x5a3a26, 0x6b4630, 0x4a2f20, 0x7a523a], PSHIRT = [0xd43f2a, 0x2a6fd4, 0xf2c300, 0x2e9b57, 0xffffff, 0x8e44ad, 0xe67e22, 0x16a085, 0x34495e, 0xf7f1e3, 0xc2185b], PPANT = [0x2c3e50, 0x1b1b1b, 0x5d4037, 0x3b4a6b, 0x7f8c8d, 0x8d6e63];
+const PSKIN = [0x5a3a26, 0x6b4630, 0x4a2f20, 0x7a523a, 0x3e2718],
+  PSHIRT = [0xd43f2a, 0x2a6fd4, 0xf2c300, 0x2e9b57, 0xffffff, 0x8e44ad, 0xe67e22, 0x16a085, 0x34495e, 0xf7f1e3, 0xc2185b, 0x1b5e20, 0xffeb3b, 0x000000],
+  PPANT = [0x2c3e50, 0x1b1b1b, 0x5d4037, 0x3b4a6b, 0x7f8c8d, 0x8d6e63, 0x1a237e];
 const _b = new THREE.Matrix4(), _m = new THREE.Matrix4(), _sv = new THREE.Vector3(), _col = new THREE.Color();
 function initPeds() {
   const n = G.Q.peds, mk = geo => { const m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), n); m.frustumCulled = false; G.scene.add(m); return m; };
   const lg = new THREE.CapsuleGeometry(.085, .64, 3, 8), ag = new THREE.CapsuleGeometry(.055, .48, 3, 8);
-  G.pm = { torso: mk(new THREE.CapsuleGeometry(.19, .3, 4, 10).scale(1.15, 1, .75)), head: mk(new THREE.SphereGeometry(.125, 12, 10).scale(.95, 1.12, 1)), legL: mk(lg), legR: mk(lg), armL: mk(ag), armR: mk(ag) };
+  G.pm = {
+    torso: mk(new THREE.CapsuleGeometry(.19, .3, 4, 10).scale(1.15, 1, .75)),
+    head: mk(new THREE.SphereGeometry(.125, 12, 10).scale(.95, 1.12, 1)),
+    legL: mk(lg), legR: mk(lg), armL: mk(ag), armR: mk(ag),
+    hat: mk(new THREE.CylinderGeometry(.13, .14, .08, 8)),
+  };
   G.peds = [];
   for (let i = 0; i < n; i++) {
-    const q = { i, on: false, x: 0, z: 0, h: 0, state: 'walk', t: 0, ph: Math.random() * 6, spd: rrand(1.1, 1.8), loop: null, k: 0, dir: 1, vx: 0, vz: 0 };
-    const sk = rpick(PSKIN); G.pm.torso.setColorAt(i, _col.set(rpick(PSHIRT))); G.pm.head.setColorAt(i, _col.set(sk)); G.pm.armL.setColorAt(i, _col.set(sk)); G.pm.armR.setColorAt(i, _col.set(sk));
+    const role = Math.random(); // variety: worker / fan / formal / casual
+    const q = { i, on: false, x: 0, z: 0, h: 0, state: 'walk', t: 0, ph: Math.random() * 6, spd: rrand(1.05, 1.85), loop: null, k: 0, dir: 1, vx: 0, vz: 0, hat: role > .72 };
+    const sk = rpick(PSKIN);
+    let shirt = rpick(PSHIRT);
+    if (role < .12) shirt = rpick([0x1b5e20, 0xffeb3b, 0xffffff]); // Warriors-ish
+    else if (role < .22) shirt = rpick([0x1565c0, 0xffffff, 0x37474f]); // office
+    G.pm.torso.setColorAt(i, _col.set(shirt)); G.pm.head.setColorAt(i, _col.set(sk));
+    G.pm.armL.setColorAt(i, _col.set(role < .3 ? shirt : sk)); G.pm.armR.setColorAt(i, _col.set(role < .3 ? shirt : sk));
     const pc = rpick(PPANT); G.pm.legL.setColorAt(i, _col.set(pc)); G.pm.legR.setColorAt(i, _col.set(pc));
+    G.pm.hat.setColorAt(i, _col.set(q.hat ? rpick([0x111111, 0x1b5e20, 0xc62828, 0xf2c300]) : 0x000000));
     G.peds.push(q); placePed(q, 12, 120);
   }
   for (const k in G.pm) G.pm[k].instanceColor.needsUpdate = true;
@@ -272,6 +293,7 @@ function updatePeds(dt) {
     pedPart(M.torso, i, 0, 1.13, 0, 0, 0, 1, 1, 1); pedPart(M.head, i, 0, 1.6, 0, 0, 0, 1, 1, 1);
     pedPart(M.legL, i, -.1, .84, 0, sw, -.41, 1, 1, 1); pedPart(M.legR, i, .1, .84, 0, -sw, -.41, 1, 1, 1);
     pedPart(M.armL, i, -.28, 1.42, 0, up ? up - .3 : -sw, -.3, 1, 1, 1); pedPart(M.armR, i, .28, 1.42, 0, up ? up + .3 : sw, -.3, 1, 1, 1);
+    if (q.hat && q.state !== 'down') pedPart(M.hat, i, 0, 1.72, 0, 0, 0, 1, 1, 1); else { _m.makeScale(0, 0, 0); M.hat.setMatrixAt(i, _m); }
   }
   for (const k in M) M[k].instanceMatrix.needsUpdate = true;
 }
@@ -638,14 +660,47 @@ function manageTraffic(dt) {
 function nearMark() { const p = pp(); for (const m of G.marks) if (dist(p.x, p.z, m.x, m.z) < m.r + 1.2) return m; return null; }
 function updateInteract() {
   const p = G.player, v = p.veh; let pr = null;
-  if (act('F')) { if (v) exitVeh(); else tryEnter(); }
+  if (act('F')) { if (v) exitVeh(); else if (!G.interior) tryEnter(); }
   if (act('H')) { sfxHorn(); if (v) for (const q of G.peds) if (q.on && q.state === 'walk' && q.d < 18) { q.state = 'flee'; q.t = 2.5; q.h = Math.atan2(q.x - v.x, q.z - v.z); } }
   if (act('R')) { radioNext(); G.radioTouched = true; toast('📻 ' + radioName(), 3.5); }
+  if (act('V') && v) {
+    G.camMode = G.camMode === 'cockpit' ? 'chase' : 'cockpit';
+    attachCockpit(v); if (v.cockpit) v.cockpit.visible = G.camMode === 'cockpit';
+    toast(G.camMode === 'cockpit' ? 'Cockpit view' : 'Chase cam', 2);
+  }
   const e = act('E'), jk = act('J');
+  // Interior enter / exit
+  if (G.interior) {
+    const dExit = dist(p.x, p.z, G.interior.door.x, G.interior.door.z);
+    if (dExit < 2.2) {
+      pr = `[E] Exit ${G.interior.title}`;
+      if (e) {
+        const door = G.interior.door, fx = Math.sin(door.h || 0), fz = Math.cos(door.h || 0);
+        leaveInterior(G.interior, G.scene); G.interior = null;
+        p.x = door.x + fx * 1.8; p.z = door.z + fz * 1.8; p.h = door.h || 0; flash('rgba(0,0,0,.85)', 180);
+        toast('Back on the street.', 2.5);
+      }
+    } else if (G.interior.buy) {
+      pr = `[E] Buy snacks / airtime — $3`;
+      if (e) { if (p.money < 3) toast('Shopkeeper: "Madiii? You need $3."'); else { earn(-3); toast('Shopkeeper: "Safe here. Fambai zvakanaka." + snacks', 3); } }
+    } else pr = 'Explore the flat · walk to the door to leave';
+    prompt(pr); return;
+  }
+  const door = !v && G.doors ? nearDoor(G.doors, p.x, p.z) : null;
+  if (door && e) {
+    flash('rgba(0,0,0,.9)', 220);
+    G.interior = enterInterior(door.kind, door, G.scene);
+    if (G.interior) {
+      p.x = G.interior.spawn.x; p.z = G.interior.spawn.z; p.h = G.interior.spawn.h; G.camH = p.h;
+      toast(`Entered ${G.interior.title}. Walk to the door · [E] to leave.`, 4);
+    }
+    prompt(null); return;
+  }
   // story trigger
   if (!G.script && STORY[G.story] && dist(pp().x, pp().z, G.storyMark.x, G.storyMark.z) < 4 && G.pspeed() < 4 && p.wanted === 0 && !(G.storyCd > 0)) { startStory(); return; }
   const m = nearMark();
-  if (G.vend.active) { pr = `Selling… stock: ${p.stock}   [E] Pack up`; if (e) stopVend('Packed up.'); }
+  if (door) pr = `[E] Enter ${door.label === 'Flat' ? "Ngwere's flat" : 'corner shop'}`;
+  else if (G.vend.active) { pr = `Selling… stock: ${p.stock}   [E] Pack up`; if (e) stopVend('Packed up.'); }
   else if (m && m.kind === 'buy') {
     pr = p.stock >= 30 ? 'You cannot carry more than 30 crates' : `[E] Buy 10 crates of produce — $10   (you have ${p.stock})`;
     if (e && p.stock < 30) { if (p.money < 10) toast('Mai Chipo: "No money, no tomatoes." (need $10)'); else { earn(-10); p.stock += 10; toast('Bought 10 crates. Sell them at an orange vending spot in town.', 4.5); } }
@@ -657,7 +712,8 @@ function updateInteract() {
     else { pr = `[E] Report for duty — ${{ zrp: 'Zimbabwe Republic Police', army: 'Zimbabwe National Army', council: 'Harare City Council', ems: 'Ambulance service' }[m.kind]}`; if (e) startScript(dutyJob(m.kind === 'zrp' ? 'police' : m.kind)); }
   } else if (v) {
     if (v.dead) pr = 'Engine dead — [F] get out';
-    else if (!G.script && v.t.job) { pr = `[J] ${v.t.job}`; if (jk) startScript(jobFor(v.type)); }
+    else if (!G.script && v.t.job) { pr = `[J] ${v.t.job}   [V] camera`; if (jk) startScript(jobFor(v.type)); }
+    else pr = `[V] ${G.camMode === 'cockpit' ? 'Chase cam' : 'Cockpit'} · [F] exit`;
   } else {
     let best = null, bd = 2.6; for (const o of G.vehicles) { const d = dist(o.x, o.z, p.x, p.z) - o.t.L / 2; if (d < bd) { bd = d; best = o; } }
     if (best) pr = `[F] ${best.ai ? 'Hijack' : 'Enter'} ${best.t.name}`;
@@ -669,12 +725,31 @@ function updateInteract() {
 // ------------------------------------------------------------------ camera, HUD, minimap
 function updateCamera(dt) {
   const p = G.player, v = p.veh, o = pp(), cam = G.camera;
+  if (G.enterT > 0) G.enterT = Math.max(0, G.enterT - dt);
   const th = v ? (v.speed < -2 ? v.h + Math.PI : v.h) : p.h;
   G.camH += angDiff(G.camH, th) * Math.min(1, dt * (v ? 3.2 : 3));
-  let d = v ? 6.5 + v.t.L * .7 + Math.abs(v.speed) * .09 : 4.3; const hgt = v ? 3 + v.t.H * .55 : 2.6;
-  const sx = Math.sin(G.camH), cz = Math.cos(G.camH);
-  for (let k = 0; k < 4 && inside(o.x - sx * d, o.z - cz * d); k++) d *= .62;
   G.shake = Math.max(0, G.shake - dt * 2.5); const sh = G.shake * .35;
+  const sx = Math.sin(G.camH), cz = Math.cos(G.camH);
+
+  // First-person cockpit when driving
+  if (v && G.camMode === 'cockpit') {
+    if (v.cockpit) v.cockpit.visible = true;
+    const blend = G.enterT > 0 ? 1 - G.enterT / .55 : 1;
+    const seatY = v.t.H * .55 + .15, seatZ = v.t.L * .08;
+    const px = v.x + sx * seatZ * .2 - Math.cos(v.h) * v.t.W * .15;
+    const pz = v.z + cz * seatZ * .2 + Math.sin(v.h) * v.t.W * .15;
+    const tx = v.x - sx * 6.5, tz = v.z - cz * 6.5, ty = 3 + v.t.H * .5;
+    cam.position.set(lerp(tx, px, blend) + (Math.random() - .5) * sh * .2, lerp(ty, seatY, blend), lerp(tz, pz, blend) + (Math.random() - .5) * sh * .2);
+    cam.lookAt(v.x + sx * 8, seatY * .9, v.z + cz * 8);
+    const fov = 68 + clamp(Math.abs(v.speed) * .35, 0, 10);
+    if (Math.abs(cam.fov - fov) > .3) { cam.fov = lerp(cam.fov, fov, .12); cam.updateProjectionMatrix(); }
+    return;
+  }
+  if (v && v.cockpit) v.cockpit.visible = false;
+
+  let d = v ? 6.5 + v.t.L * .7 + Math.abs(v.speed) * .09 : (G.interior ? 3.2 : 4.3);
+  const hgt = v ? 3 + v.t.H * .55 : (G.interior ? 2.1 : 2.6);
+  for (let k = 0; k < 4 && !G.interior && inside(o.x - sx * d, o.z - cz * d); k++) d *= .62;
   cam.position.set(o.x - sx * d + (Math.random() - .5) * sh, hgt + (Math.random() - .5) * sh, o.z - cz * d + (Math.random() - .5) * sh);
   cam.lookAt(o.x + sx * 4, v ? 1.5 : 1.5, o.z + cz * 4);
   const fov = 62 + (v ? clamp(Math.abs(v.speed) * .45, 0, 14) : 0); if (Math.abs(cam.fov - fov) > .3) { cam.fov = lerp(cam.fov, fov, .1); cam.updateProjectionMatrix(); }
@@ -871,9 +946,10 @@ function startGame(q, fresh) {
   const ct = soft('rgba(255,255,255,.95)', 'rgba(255,255,255,0)'); G.clouds = [];
   for (let i = 0; i < (Q.low ? 6 : 12); i++) { const c = new THREE.Sprite(new THREE.SpriteMaterial({ map: ct, fog: false, depthWrite: false, depthTest: false, transparent: true })); c.userData = { a: Math.random() * 6.28, e: .12 + Math.random() * .32 }; c.scale.set(Q.far * (.3 + Math.random() * .3), Q.far * (.07 + Math.random() * .05), 1); c.renderOrder = -1; sc.add(c); G.clouds.push(c); }
   Object.assign(G, { vehicles: [], peds: [], fleet: [], in: { thr: 0, steer: 0, hb: 0, run: 0 }, time: 0, frame: 0, clock: 7.5 * 60, chaos: 0, shake: 0, hits: 0, script: null, dialog: null, duty: null, target: null, route: null, chase: null, sv: null, rb: null,
-    vend: { active: false, spot: null, saleT: 0, raidT: 0, raid: null, sold: 0, busted: false }, trafT: 0, fleetT: 3, copT: 0, evadeT: 0, bustT: 0, wantCd: 0, lodT: 0, hudT: 0, routeT: 0, ambT: 12, sigT: 0, lawT: 0, lastSig: -1, emsCd: 5, ems: null, downPed: null, nightV: -1, potCd: 0, smT: 0, smI: 0, camH: 0, story: 0, paused: false, mapOpen: false });
+    vend: { active: false, spot: null, saleT: 0, raidT: 0, raid: null, sold: 0, busted: false }, trafT: 0, fleetT: 3, copT: 0, evadeT: 0, bustT: 0, wantCd: 0, lodT: 0, hudT: 0, routeT: 0, ambT: 12, sigT: 0, lawT: 0, lastSig: -1, emsCd: 5, ems: null, downPed: null, nightV: -1, potCd: 0, smT: 0, smI: 0, camH: 0, story: 0, paused: false, mapOpen: false, interior: null, doors: null, camMode: 'chase', enterT: 0 });
   buildWorld(sc);
   makePlayer();
+  G.doors = placeDoors(sc, PL);
   const sv = fresh ? null : load(); if (sv) { G.player.money = sv.money || 0; G.story = clamp(sv.story | 0, 0, STORY.length); }
   G.camH = G.player.h; initPeds(); initMarkers(); ensureFleet(true); for (const k in G.pm) G.pm[k].castShadow = Q.shadow > 0;
   // smoke sprites

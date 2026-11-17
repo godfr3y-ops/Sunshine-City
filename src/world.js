@@ -105,18 +105,43 @@ export function findRoad(name, x, z) { let best = null, bd = 1e18; for (const s 
 function facade(kind) {
   const S = 256, c = document.createElement('canvas'), e = document.createElement('canvas'); c.width = c.height = e.width = e.height = S;
   const x = c.getContext('2d'), y = e.getContext('2d'); y.fillStyle = '#000'; y.fillRect(0, 0, S, S); x.fillStyle = '#fff'; x.fillRect(0, 0, S, S);
-  if (kind === 'shed') { for (let i = 0; i < S; i += 8) { x.fillStyle = i % 16 ? '#e2e2e2' : '#cfcfcf'; x.fillRect(i, 0, 3, S); } x.fillStyle = '#555'; x.fillRect(96, 150, 64, 106); }
-  else if (kind === 'shop') { x.fillStyle = '#26323c'; x.fillRect(0, 84, S, 158); x.fillStyle = '#3d5163'; x.fillRect(0, 84, S, 30); x.fillStyle = '#d9d9d9'; for (let i = 0; i < S; i += 64) x.fillRect(i, 84, 4, 158); x.fillStyle = '#8a8a86'; x.fillRect(0, 242, S, 14);
-    x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(0, 76, S, 8); x.fillStyle = 'rgba(0,0,0,.5)'; x.font = 'bold 34px Arial'; x.fillText('SHOP · SALE · AIRTIME', 8, 52); x.fillStyle = '#14202a'; x.fillRect(140, 120, 40, 122);
-    y.fillStyle = '#6e5a30'; y.fillRect(0, 114, S, 124); y.fillStyle = '#000'; for (let i = 0; i < S; i += 64) y.fillRect(i, 84, 4, 158); y.fillStyle = '#3a3a34'; y.fillRect(0, 0, S, 76); }
-  else for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+  const signs = ['AIRTIME · ECOCASH', 'MAPUTI · FREEZITS', 'BUREAU DE CHANGE', 'CHICKEN INN STYLE', 'PHONE ACCESSORIES', 'BOTTLE STORE', 'SALON · BARBER', 'SUPERETTE · BREAD'];
+  if (kind === 'shed') {
+    for (let i = 0; i < S; i += 8) { x.fillStyle = i % 16 ? '#e2e2e2' : '#cfcfcf'; x.fillRect(i, 0, 3, S); }
+    x.fillStyle = '#555'; x.fillRect(96, 150, 64, 106);
+    x.fillStyle = 'rgba(120,80,40,.15)'; for (let i = 0; i < 40; i++) x.fillRect(rnd() * S, rnd() * S, 3, 8);
+  } else if (kind === 'shop') {
+    const sign = signs[(rnd() * signs.length) | 0];
+    const awning = ['#c62828', '#1565c0', '#2e7d32', '#f9a825', '#6a1b9a'][(rnd() * 5) | 0];
+    x.fillStyle = '#26323c'; x.fillRect(0, 84, S, 158); x.fillStyle = awning; x.fillRect(0, 72, S, 28);
+    x.fillStyle = '#d9d9d9'; for (let i = 0; i < S; i += 64) x.fillRect(i, 84, 4, 158);
+    x.fillStyle = '#8a8a86'; x.fillRect(0, 242, S, 14);
+    x.fillStyle = 'rgba(0,0,0,.55)'; x.font = 'bold 26px Arial'; x.fillText(sign, 8, 52);
+    x.fillStyle = '#14202a'; x.fillRect(140 + ((rnd() * 40) | 0), 120, 40, 122);
+    // posters / stickers
+    for (let i = 0; i < 3; i++) { x.fillStyle = `hsla(${rnd() * 360},60%,45%,.85)`; x.fillRect(12 + i * 42, 130, 36, 48); }
+    y.fillStyle = '#6e5a30'; y.fillRect(0, 114, S, 124); y.fillStyle = '#000'; for (let i = 0; i < S; i += 64) y.fillRect(i, 84, 4, 158); y.fillStyle = '#3a3a34'; y.fillRect(0, 0, S, 76);
+  } else for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
     const ox = i * 64, oy = j * 64, lit = rnd() < (kind === 'glass' ? .22 : .26);
-    if (kind === 'glass') { const g = x.createLinearGradient(0, oy, 0, oy + 64); g.addColorStop(0, '#9fc0dd'); g.addColorStop(1, '#55789c'); x.fillStyle = g; x.fillRect(ox, oy, 64, 64); x.fillStyle = '#dfe9f2'; x.fillRect(ox, oy, 64, 3); x.fillRect(ox, oy, 3, 64); x.fillStyle = 'rgba(255,255,255,.14)'; x.fillRect(ox + 8, oy + 8, 20, 50);
-      if (lit) { y.fillStyle = rnd() < .5 ? '#8fa6c8' : '#c9a868'; y.fillRect(ox + 4, oy + 5, 58, 57); } }
-    else if (kind === 'office') { x.fillStyle = '#d9d9d9'; x.fillRect(ox, oy + 50, 64, 14); x.fillStyle = '#31465b'; x.fillRect(ox + 5, oy + 10, 54, 36); x.fillStyle = '#4f6e8c'; x.fillRect(ox + 5, oy + 10, 54, 9); x.fillStyle = '#1f2d3a'; x.fillRect(ox + 31, oy + 10, 2, 36);
-      if (lit) { y.fillStyle = '#c9a868'; y.fillRect(ox + 5, oy + 19, 54, 27); } }
-    else { x.fillStyle = '#e6e6e6'; x.fillRect(ox + 17, oy + 13, 30, 36); x.fillStyle = '#2f4254'; x.fillRect(ox + 20, oy + 16, 24, 30); x.fillStyle = '#4b6680'; x.fillRect(ox + 20, oy + 16, 24, 8); x.fillStyle = '#dcdcdc'; x.fillRect(ox + 31, oy + 16, 2, 30); x.fillRect(ox + 15, oy + 49, 34, 3);
-      if (lit) { y.fillStyle = '#d9b060'; y.fillRect(ox + 20, oy + 24, 24, 22); } }
+    if (kind === 'glass') {
+      const g = x.createLinearGradient(0, oy, 0, oy + 64); g.addColorStop(0, rnd() < .5 ? '#9fc0dd' : '#8eb8c9'); g.addColorStop(1, '#55789c');
+      x.fillStyle = g; x.fillRect(ox, oy, 64, 64); x.fillStyle = '#dfe9f2'; x.fillRect(ox, oy, 64, 3); x.fillRect(ox, oy, 3, 64);
+      x.fillStyle = 'rgba(255,255,255,.14)'; x.fillRect(ox + 8, oy + 8, 20, 50);
+      if (lit) { y.fillStyle = rnd() < .5 ? '#8fa6c8' : '#c9a868'; y.fillRect(ox + 4, oy + 5, 58, 57); }
+    } else if (kind === 'office') {
+      x.fillStyle = rnd() < .3 ? '#cfc8bc' : '#d9d9d9'; x.fillRect(ox, oy + 50, 64, 14);
+      x.fillStyle = '#31465b'; x.fillRect(ox + 5, oy + 10, 54, 36); x.fillStyle = '#4f6e8c'; x.fillRect(ox + 5, oy + 10, 54, 9);
+      x.fillStyle = '#1f2d3a'; x.fillRect(ox + 31, oy + 10, 2, 36);
+      if (rnd() < .2) { x.fillStyle = '#b71c1c'; x.fillRect(ox + 48, oy + 4, 10, 6); } // AC unit hint
+      if (lit) { y.fillStyle = '#c9a868'; y.fillRect(ox + 5, oy + 19, 54, 27); }
+    } else {
+      // plaster / flats — weathered
+      x.fillStyle = rnd() < .5 ? '#e6e6e6' : '#ddd6c8'; x.fillRect(ox + 17, oy + 13, 30, 36);
+      x.fillStyle = '#2f4254'; x.fillRect(ox + 20, oy + 16, 24, 30); x.fillStyle = '#4b6680'; x.fillRect(ox + 20, oy + 16, 24, 8);
+      x.fillStyle = '#dcdcdc'; x.fillRect(ox + 31, oy + 16, 2, 30); x.fillRect(ox + 15, oy + 49, 34, 3);
+      if (rnd() < .25) { x.fillStyle = 'rgba(90,70,40,.2)'; x.fillRect(ox + 10, oy + 40, 44, 18); }
+      if (lit) { y.fillStyle = '#d9b060'; y.fillRect(ox + 20, oy + 24, 24, 22); }
+    }
   }
   return new THREE.MeshLambertMaterial({ map: canvasTex(c, true), vertexColors: true, emissiveMap: kind === 'shed' ? null : canvasTex(e, true), emissive: kind === 'shed' ? 0 : 0xffffff, emissiveIntensity: 0 });
 }
