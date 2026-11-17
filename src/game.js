@@ -5,6 +5,7 @@ import { spawnVeh, collideVehicles, updateAI, toLane, lanePose } from './vehicle
 import { A, audioInit, audioUnlock, sfxHorn, sfxCrash, sfxCash, sfxWhistle, audioUpdate, radioNext, radioName, speakPhrase } from './audio.js';
 import { pickHwindi, pickBanter, pickPax, ambientFor, PAX_FUNNY } from './phrases.js';
 import { placeDoors, enterInterior, leaveInterior, collideInterior, nearDoor, attachCockpit } from './interiors.js';
+import { makeNgwere } from './character.js';
 
 const $ = id => document.getElementById(id);
 const QUAL = {
@@ -74,7 +75,7 @@ function showDialog(lines) { G.dialog = { lines, i: 0 }; drawDialog(); $('dialog
 function drawDialog() { const d = G.dialog, l = d.lines[d.i]; $('dn').textContent = l[0]; $('dt').textContent = l[1]; }
 function advanceDialog() { const d = G.dialog; if (!d) return; d.i++; if (d.i >= d.lines.length) { G.dialog = null; $('dialog').classList.add('hide'); } else drawDialog(); }
 function earn(n) { const p = G.player; p.money = Math.max(0, p.money + n); if (n > 0) sfxCash(); G.cashFx = 1; save(); }
-function save() { try { localStorage.setItem('sunshine-city', JSON.stringify({ money: G.player.money, story: G.story })); } catch (e) { } }
+function save() { try { localStorage.setItem('sunshine-city', JSON.stringify({ money: G.player.money, bank: G.player.bank || 0, story: G.story })); } catch (e) { } }
 function load() { try { return JSON.parse(localStorage.getItem('sunshine-city')) || null; } catch (e) { return null; } }
 
 const pp = () => G.player.veh || G.player;
@@ -86,55 +87,9 @@ function hurt(n) { const p = G.player; if (p.hp <= 0) return; p.hp -= n; G.hurtF
 // Ngwere — built from rounded shapes with jointed hips, knees, shoulders and elbows:
 // black hoodie with yellow sleeve stripes and chest script, white tee hem, cargo pants, flag cap, locs, backpack, yellow-and-black high-tops
 function makePlayer() {
-  const g = new THREE.Group(), mats = {};
-  const mat = c => mats[c] || (mats[c] = new THREE.MeshStandardMaterial({
-    color: c, roughness: c === 0x6a4530 ? .62 : .78, metalness: 0.04,
-    emissive: c === 0x6a4530 ? 0x1a0f0a : 0x000000, emissiveIntensity: c === 0x6a4530 ? .12 : 0,
-  }));
-  const add = (geo, m, x, y, z, parent) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; (parent || g).add(o); return o; };
-  const cap = (r, len, sx = 1, sz = 1) => new THREE.CapsuleGeometry(r, len, 6, 14).scale(sx, 1, sz), box = (w, h, d) => new THREE.BoxGeometry(w, h, d), sph = (r, sx = 1, sy = 1, sz = 1) => new THREE.SphereGeometry(r, 22, 16).scale(sx, sy, sz);
-  const grp = (x, y, z, parent) => { const o = new THREE.Group(); o.position.set(x, y, z); (parent || g).add(o); return o; };
-  const BLK = 0x18181b, YEL = 0xf2b90f, SK = 0x6a4530, LOC = 0x19110b, PANT = 0x1d1d20;
-  const tex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
-  // head with a painted face (sphere UV: the front of the head is at u = 0.25)
-  const face = tex(512, 256, x => { x.fillStyle = '#6a4530'; x.fillRect(0, 0, 512, 256); const cx = 128;
-    x.fillStyle = 'rgba(0,0,0,.16)'; x.fillRect(cx - 54, 150, 108, 60); x.fillStyle = 'rgba(255,220,190,.07)'; x.fillRect(cx - 30, 70, 60, 50);
-    for (const s of [-1, 1]) { x.fillStyle = '#f3efe8'; x.beginPath(); x.ellipse(cx + s * 25, 112, 11, 6, 0, 0, 6.3); x.fill(); x.fillStyle = '#2a1a10'; x.beginPath(); x.arc(cx + s * 25, 112, 5.2, 0, 6.3); x.fill(); x.fillStyle = '#0c0806'; x.beginPath(); x.arc(cx + s * 25, 112, 2.4, 0, 6.3); x.fill();
-      x.strokeStyle = '#1a100a'; x.lineWidth = 5; x.lineCap = 'round'; x.beginPath(); x.moveTo(cx + s * 12, 98); x.quadraticCurveTo(cx + s * 25, 91, cx + s * 39, 99); x.stroke(); x.lineWidth = 2; x.beginPath(); x.moveTo(cx + s * 13, 109); x.quadraticCurveTo(cx + s * 25, 103, cx + s * 37, 110); x.stroke(); }
-    x.strokeStyle = 'rgba(30,15,8,.55)'; x.lineWidth = 3; x.beginPath(); x.moveTo(cx - 4, 112); x.lineTo(cx - 8, 140); x.quadraticCurveTo(cx, 147, cx + 8, 140); x.stroke(); x.fillStyle = 'rgba(20,10,5,.6)'; x.beginPath(); x.ellipse(cx - 6, 142, 3, 2, 0, 0, 6.3); x.ellipse(cx + 6, 142, 3, 2, 0, 0, 6.3); x.fill();
-    x.fillStyle = '#4a2a22'; x.beginPath(); x.ellipse(cx, 166, 17, 6.5, 0, 0, 6.3); x.fill(); x.strokeStyle = '#2e1812'; x.lineWidth = 2; x.beginPath(); x.moveTo(cx - 16, 165); x.quadraticCurveTo(cx, 169, cx + 16, 165); x.stroke();
-    x.fillStyle = 'rgba(15,8,4,.35)'; x.fillRect(cx - 40, 178, 80, 14); });
-  const head = grp(0, 1.6, 0); add(new THREE.SphereGeometry(.118, 28, 22).scale(.92, 1.14, 1), new THREE.MeshStandardMaterial({ map: face, roughness: .55, metalness: .02, emissive: 0xffffff, emissiveMap: face, emissiveIntensity: .18 }), 0, 0, 0, head);
-  for (const s of [-1, 1]) add(sph(.03, .5, 1, .8), SK, s * .108, -.005, .0, head);
-  add(new THREE.CylinderGeometry(.05, .058, .1, 12), SK, 0, 1.47, 0);
-  // cap, brim and flag patch
-  add(new THREE.SphereGeometry(.128, 20, 10, 0, 6.3, 0, Math.PI / 2).scale(.95, .8, 1.02), 0x0c0c0e, 0, .06, 0, head); add(new THREE.CylinderGeometry(.128 * .95, .128 * .95, .028, 20).scale(1, 1, 1.02), 0x0c0c0e, 0, .054, 0, head);
-  add(new THREE.CylinderGeometry(.105, .105, .014, 18, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 1.25), 0x0c0c0e, 0, .05, .075, head).castShadow = false;
-  const flagT = tex(64, 40, x => { ['#1e8e4e', '#f2c300', '#c62828', '#111', '#c62828', '#f2c300', '#1e8e4e'].forEach((c, i) => { x.fillStyle = c; x.fillRect(0, i * 40 / 7, 64, 40 / 7 + 1); }); x.fillStyle = '#fff'; x.beginPath(); x.moveTo(0, 0); x.lineTo(24, 20); x.lineTo(0, 40); x.fill(); x.fillStyle = '#f2c300'; x.fillRect(4, 16, 8, 8); }), flagM = new THREE.MeshBasicMaterial({ map: flagT });
-  const fp = add(new THREE.PlaneGeometry(.07, .042), flagM, 0, .112, .127, head); fp.rotation.x = -.25;
-  // locs hanging from under the cap
-  for (let i = 0; i < 15; i++) { const th = Math.PI * (-.06 + i * 1.12 / 14), ln = .15 + (i % 4) * .035, o = add(cap(.016, ln), LOC, Math.cos(th) * .112, .0 - ln / 2, -Math.sin(th) * .112 - .012, head); o.rotation.z = Math.cos(th) * .18; o.rotation.x = Math.sin(th) * .14; }
-  // hoodie torso, hood, tee hem, pouch, drawstrings, chest script
-  add(cap(.175, .34, 1.16, .8), BLK, 0, 1.15, 0); add(sph(.15, 1.15, .62, .85), BLK, 0, 1.45, -.085); add(new THREE.CylinderGeometry(.2, .2, .05, 16).scale(1.19, 1, .8), 0xf4f4f4, 0, .845, 0);
-  add(new THREE.CylinderGeometry(.205, .21, .09, 16).scale(1.19, 1, .8), 0x141416, 0, .91, 0); add(box(.26, .13, .03), 0x202024, 0, 1.0, .155);
-  const logoT = tex(256, 96, x => { x.clearRect(0, 0, 256, 96); x.fillStyle = '#f2b90f'; x.font = 'italic bold 64px Georgia, serif'; x.textAlign = 'center'; x.fillText('Ngwere', 128, 68); });
-  add(new THREE.PlaneGeometry(.36, .135), new THREE.MeshBasicMaterial({ map: logoT, transparent: true }), 0, 1.24, .163);
-  for (const s of [-1, 1]) { add(new THREE.CylinderGeometry(.006, .006, .2, 5), YEL, s * .045, 1.33, .165); add(box(.045, .46, .02), 0x0e0e10, s * .15, 1.2, .15).rotation.z = s * .05; }
-  // backpack
-  add(cap(.125, .2, 1.3, .75), 0x101012, 0, 1.15, -.225); add(box(.2, .11, .03), 0x1a1a1e, 0, 1.08, -.325); add(box(.07, .025, .01), 0x8a8a8a, 0, 1.2, -.326);
-  // arms: shoulder → elbow → hand, yellow stripe down the sleeve, sleeves pushed up
-  const arm = s => { const sh = grp(s * .25, 1.39, 0); add(cap(.06, .2), BLK, 0, -.15, 0, sh); add(box(.014, .32, .055), YEL, s * .056, -.16, 0, sh); add(sph(.064, 1, .85, 1), BLK, -s * .01, -.01, 0, sh);
-    const el = grp(0, -.3, 0, sh); add(cap(.052, .1), BLK, 0, -.07, 0, el); add(box(.014, .14, .05), YEL, s * .05, -.07, 0, el); add(new THREE.CylinderGeometry(.056, .056, .035, 10), 0x141416, 0, -.15, 0, el); add(cap(.04, .1), SK, 0, -.21, 0, el); add(sph(.045, .8, 1.15, 1), SK, 0, -.315, .005, el);
-    if (s < 0) add(new THREE.CylinderGeometry(.046, .046, .028, 10), 0x0a0a0a, 0, -.265, 0, el); return [sh, el]; };
-  // legs: hip → knee → sneaker, cargo pockets, flag patch on the left pocket
-  const leg = s => { const hip = grp(s * .1, .87, 0); add(cap(.088, .26), PANT, 0, -.2, 0, hip); add(box(.035, .15, .12), 0x242428, s * .092, -.27, 0, hip); add(box(.037, .03, .125), 0x2c2c31, s * .092, -.2, 0, hip);
-    if (s < 0) { const f = add(new THREE.PlaneGeometry(.05, .03), flagM, s * .112, -.27, 0, hip); f.rotation.y = -Math.PI / 2; }
-    const kn = grp(0, -.42, 0, hip); add(cap(.072, .24), PANT, 0, -.18, 0, kn); add(new THREE.CylinderGeometry(.068, .062, .05, 10), 0x141416, 0, -.36, 0, kn);
-    add(new THREE.CylinderGeometry(.058, .062, .08, 10), 0x0c0c0e, 0, -.39, -.005, kn); add(box(.098, .085, .25), 0x0c0c0e, 0, -.405, .05, kn); add(box(.1, .055, .09), YEL, 0, -.42, .135, kn); add(box(.102, .05, .1), YEL, 0, -.4, -.03, kn); add(box(.1, .03, .06), YEL, 0, -.375, .06, kn); add(box(.106, .024, .27), 0xf6f6f2, 0, -.458, .05, kn); add(box(.108, .012, .275), YEL, 0, -.474, .05, kn);
-    return [hip, kn]; };
-  const [aL, eL] = arm(-1), [aR, eR] = arm(1), [lL, kL] = leg(-1), [lR, kR] = leg(1);
+  const { group: g, parts } = makeNgwere();
   G.scene.add(g);
-  G.player = { x: W.start.x, z: W.start.z, h: W.start.h, hp: 100, veh: null, money: 30, wanted: 0, stock: 0, mesh: g, parts: { legL: lL, legR: lR, armL: aL, armR: aR, kL, kR, eL, eR, head }, anim: 0, spd: 0, hitCd: 0 };
+  G.player = { x: W.start.x, z: W.start.z, h: W.start.h, hp: 100, veh: null, money: 30, wanted: 0, stock: 0, mesh: g, parts, anim: 0, spd: 0, hitCd: 0, bank: 0 };
 }
 function updateFoot(dt) {
   const p = G.player, i = G.in;
@@ -680,10 +635,36 @@ function updateInteract() {
         p.x = door.x + fx * 1.8; p.z = door.z + fz * 1.8; p.h = door.h || 0; flash('rgba(0,0,0,.85)', 180);
         toast('Back on the street.', 2.5);
       }
-    } else if (G.interior.buy) {
+    } else if (G.interior.action === 'shop') {
       pr = `[E] Buy snacks / airtime — $3`;
-      if (e) { if (p.money < 3) toast('Shopkeeper: "Madiii? You need $3."'); else { earn(-3); toast('Shopkeeper: "Safe here. Fambai zvakanaka." + snacks', 3); } }
-    } else pr = 'Explore the flat · walk to the door to leave';
+      if (e) { if (p.money < 3) toast('Shopkeeper: "Madiii? You need $3."'); else { earn(-3); toast('Shopkeeper: "Safe here. Fambai zvakanaka."', 3); } }
+    } else if (G.interior.action === 'bank') {
+      pr = `[E] Deposit $10  ·  [J] Withdraw $10   (pocket $${p.money | 0} · bank $${(p.bank || 0) | 0})`;
+      if (e) {
+        if (p.money < 10) toast('Teller: "Minimum deposit is $10."');
+        else { earn(-10); p.bank = (p.bank || 0) + 10; save(); toast('Teller: "Deposit received. Fambai zvakanaka." Bank $' + p.bank, 3.5); }
+      }
+      if (jk) {
+        if ((p.bank || 0) < 10) toast('Teller: "Insufficient balance."');
+        else { p.bank -= 10; earn(10); save(); toast('Teller: "Here is your $10." Bank $' + p.bank, 3.5); }
+      }
+    } else if (G.interior.action === 'zrp') {
+      if (p.wanted > 0) {
+        pr = `[E] Turn yourself in (pay fine)`;
+        if (e) {
+          const fine = Math.min(p.money, 15 + p.wanted * 10);
+          earn(-fine); p.wanted = 0; G.engaged = false; save();
+          toast(`Desk sergeant: "Fine paid $${fine}. Stay out of trouble, Ngwere."`, 4);
+        }
+      } else {
+        pr = `[E] Ask about duty / tip the desk`;
+        if (e) toast(rpick([
+          'Sergeant: "Report at the blue ZRP marker outside for patrol."',
+          'Constable: "Spanner\'s boys were seen near Copacabana."',
+          'Desk: "Keep left, respect the robots. Fambai zvakanaka."',
+        ]), 4);
+      }
+    } else pr = `Explore ${G.interior.title} · walk to the door to leave`;
     prompt(pr); return;
   }
   const door = !v && G.doors ? nearDoor(G.doors, p.x, p.z) : null;
@@ -699,7 +680,8 @@ function updateInteract() {
   // story trigger
   if (!G.script && STORY[G.story] && dist(pp().x, pp().z, G.storyMark.x, G.storyMark.z) < 4 && G.pspeed() < 4 && p.wanted === 0 && !(G.storyCd > 0)) { startStory(); return; }
   const m = nearMark();
-  if (door) pr = `[E] Enter ${door.label === 'Flat' ? "Ngwere's flat" : 'corner shop'}`;
+  const doorNames = { Flat: "Ngwere's flat", Shop: 'corner shop', Bank: 'bank hall', ZRP: 'Harare Central ZRP' };
+  if (door) pr = `[E] Enter ${doorNames[door.label] || door.label}`;
   else if (G.vend.active) { pr = `Selling… stock: ${p.stock}   [E] Pack up`; if (e) stopVend('Packed up.'); }
   else if (m && m.kind === 'buy') {
     pr = p.stock >= 30 ? 'You cannot carry more than 30 crates' : `[E] Buy 10 crates of produce — $10   (you have ${p.stock})`;
@@ -950,7 +932,7 @@ function startGame(q, fresh) {
   buildWorld(sc);
   makePlayer();
   G.doors = placeDoors(sc, PL);
-  const sv = fresh ? null : load(); if (sv) { G.player.money = sv.money || 0; G.story = clamp(sv.story | 0, 0, STORY.length); }
+  const sv = fresh ? null : load(); if (sv) { G.player.money = sv.money || 0; G.player.bank = sv.bank || 0; G.story = clamp(sv.story | 0, 0, STORY.length); }
   G.camH = G.player.h; initPeds(); initMarkers(); ensureFleet(true); for (const k in G.pm) G.pm[k].castShadow = Q.shadow > 0;
   // smoke sprites
   const scv = document.createElement('canvas'); scv.width = scv.height = 32; const sx = scv.getContext('2d'), gr = sx.createRadialGradient(16, 16, 1, 16, 16, 15); gr.addColorStop(0, 'rgba(70,70,70,1)'); gr.addColorStop(1, 'rgba(70,70,70,0)'); sx.fillStyle = gr; sx.fillRect(0, 0, 32, 32);

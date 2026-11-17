@@ -19,7 +19,7 @@ for (const k in VT) VT[k].id = k;
 
 const GL = 0x1b2733, TY = 0x121212, LT = 0xfff3c0, RD = 0xb31717, STR = [0x1f6fd1, 0xc62828, 0x1e8e4e, 0xf2a900];
 const cache = {};
-export const matVeh = new THREE.MeshLambertMaterial({ vertexColors: true });
+export const matVeh = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .55, metalness: .18 });
 
 export function vehGeo(type, color, lo) {
   const k = type + ':' + color + (lo ? 'L' : 'H');

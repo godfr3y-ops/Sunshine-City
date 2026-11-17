@@ -36,13 +36,15 @@ AI concept renders (Ngwere cinematic stills, Joina/RBZ skyline) are **art direct
 
 Do **not** claim these done until acceptance tests pass in-game.
 
-### Phase A — Immersion foundation ✅ (v1 shipped)
+### Phase A — Immersion foundation ✅
 - [x] Door enter/exit + apartment + shop interiors  
 - [x] Vehicle cockpit camera (+ enter blend)  
 - [x] CBD facade/signage variety  
 - [x] Ped clothing/hat variants  
-- [ ] More interiors (bank, ZRP desk)  
+- [x] Bank hall (deposit/withdraw) + ZRP station interior  
+- [x] Higher-detail Ngwere mesh (`character.js`) + PBR vehicle materials  
 - [ ] Real mirror render targets (mobile-costly)  
+- [ ] Artist-authored glTF / scanned AAA bodies (external pipeline)  
 
 ### Phase B — Living Harare
 - District identity: Mbare, Avondale, Borrowdale (streamed chunks)
