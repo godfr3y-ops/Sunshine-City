@@ -50,10 +50,8 @@ xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
 
 ## Android
 
-- **Debug APK** always built (sideload with USB / files app).
-- **Signed release APK/AAB** if these secrets exist:  
-  `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+Artifact **`android-unsigned-apk`** — debug APK (install via USB / Files). No keystore secrets required.
 
 ## Web
 
-Artifact `web-install-zip` — open `index.html` or host as a PWA.
+Artifact **`web-install-zip`** — open `index.html` or host as a PWA (includes app icons).

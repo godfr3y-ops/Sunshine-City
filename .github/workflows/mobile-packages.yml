@@ -1,8 +1,9 @@
-name: Mobile release packages (iOS IPA · Android · Web)
+name: Mobile packages (unsigned)
 
-# iOS: unsigned device IPA (iphoneos / arm64) for Sideloadly re-sign on your phone.
-# Android: signed release when keystore secrets exist.
-# Web: installable zip.
+# Unsigned installables only:
+# - Web zip (with icons)
+# - Android debug APK
+# - iOS device IPA for Sideloadly (iphoneos / arm64, unsigned)
 
 on:
   push:
@@ -39,8 +40,8 @@ jobs:
           name: web-install-zip
           path: ${{ env.APP_NAME }}-web.zip
 
-  android-release:
-    name: Android packages
+  android-unsigned:
+    name: Android unsigned debug APK
     runs-on: ubuntu-latest
     needs: web-build
     steps:
@@ -60,37 +61,22 @@ jobs:
           npx cap add android
           npx cap sync android
           node tools/ci/apply-native-icons.mjs
-      - name: Build debug APK (always installable for testing)
+      - name: Build debug APK
         working-directory: android
         run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
-      - name: Signed release (if keystore secrets present)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        working-directory: android
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          SUNSHINE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          SUNSHINE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          SUNSHINE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          echo -n "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/sunshine-upload.jks
-          cd ..
-          node tools/ci/patch-android-signing.mjs
-          cd android
-          export SUNSHINE_KEYSTORE_PATH=sunshine-upload.jks
-          ./gradlew assembleRelease bundleRelease --no-daemon
-      - name: Collect packages
+      - name: Collect APK
         run: |
           mkdir -p packages/android
-          find android/app/build/outputs -type f \( -name '*.apk' -o -name '*.aab' \) -exec cp -v {} packages/android/ \;
+          find android/app/build/outputs -type f -name '*.apk' -exec cp -v {} packages/android/ \;
           ls -lah packages/android
       - uses: actions/upload-artifact@v4
         with:
-          name: android-packages
+          name: android-unsigned-apk
           path: packages/android/
           if-no-files-found: error
 
   ios-sideload:
-    name: iOS unsigned IPA (Sideloadly / real iPhone)
+    name: iOS unsigned IPA (Sideloadly)
     runs-on: macos-latest
     needs: web-build
     steps:
@@ -112,7 +98,6 @@ jobs:
       - name: Build Release for real devices (iphoneos, unsigned)
         working-directory: ios/App
         run: |
-          # Device slice (arm64) — NOT simulator. Sideloadly re-signs on install.
           xcodebuild \
             -workspace App.xcworkspace \
             -scheme App \
@@ -130,9 +115,6 @@ jobs:
           chmod +x tools/ci/package-unsigned-ipa.sh
           APP_PATH=$(find ios/App/build/Build/Products -type d -name '*.app' | head -1)
           echo "Found app: $APP_PATH"
-          # Confirm it's a device binary, not simulator
-          lipo -info "$APP_PATH/App" 2>/dev/null || lipo -info "$APP_PATH"/* 2>/dev/null || true
-          file "$APP_PATH"/* 2>/dev/null | head -20 || true
           mkdir -p packages/ios
           tools/ci/package-unsigned-ipa.sh "$APP_PATH" "$PWD/packages/ios/${{ env.APP_NAME }}-unsigned-sideloadly.ipa"
           ls -lah packages/ios
