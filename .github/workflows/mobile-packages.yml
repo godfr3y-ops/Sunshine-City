@@ -110,11 +110,14 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PRODUCT_BUNDLE_IDENTIFIER="${{ env.BUNDLE_ID }}" \
             build
-      - name: Package Sideloadly IPA
+      - name: Fix framework bundle IDs + package Sideloadly IPA
         run: |
-          chmod +x tools/ci/package-unsigned-ipa.sh
+          chmod +x tools/ci/package-unsigned-ipa.sh tools/ci/fix-ios-framework-ids.sh
           APP_PATH=$(find ios/App/build/Build/Products -type d -name '*.app' | head -1)
           echo "Found app: $APP_PATH"
+          # Capacitor.framework + Cordova.framework must not share CFBundleIdentifier
+          # (Sideloadly DuplicateIdentifier install failure)
+          tools/ci/fix-ios-framework-ids.sh "$APP_PATH"
           mkdir -p packages/ios
           tools/ci/package-unsigned-ipa.sh "$APP_PATH" "$PWD/packages/ios/${{ env.APP_NAME }}-unsigned-sideloadly.ipa"
           ls -lah packages/ios

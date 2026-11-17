@@ -21,11 +21,14 @@ This is **not** a simulator build. Simulator apps will not run on a physical iPh
 
 ### Install steps
 
-1. Run GitHub Action **Mobile release packages** (or push to `main`/`master`).
+1. Run GitHub Action **Mobile packages** (or push to `main`/`master`).
 2. Download artifact **`ios-sideloadly-ipa`**.
-3. Open Sideloadly → connect iPhone → select the `.ipa`.
-4. Sign in with your Apple ID → Start.
-5. On iPhone: **Settings → General → VPN & Device Management** → trust your Apple ID, then launch **Sunshine City**.
+3. On the iPhone, delete any older **Sunshine City** install first (avoids leftover staging conflicts).
+4. Open Sideloadly → connect iPhone → select the `.ipa`.
+5. Sign in with your Apple ID → Start.
+6. On iPhone: **Settings → General → VPN & Device Management** → trust your Apple ID, then launch **Sunshine City**.
+
+CI patches `Capacitor.framework` / `Cordova.framework` to unique bundle IDs so Sideloadly does not hit `DuplicateIdentifier`.
 
 Free Apple ID sideloads usually expire after ~7 days; re-install with Sideloadly when needed.  
 Paid Developer account + Sideloadly can last longer depending on your signing setup.
