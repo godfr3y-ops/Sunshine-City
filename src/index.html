@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffd23f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<title>Sunshine City: Harare Hustle</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#101418;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hide{display:none!important}
+.dsp{font-family:"Bebas Neue",Impact,"Arial Narrow",sans-serif;letter-spacing:.03em}
+#hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.9)}
+#tl{position:absolute;left:12px;top:10px}
+#money{font-size:34px;color:#7CFC9A;transform-origin:left center;line-height:1}
+#stars{font-size:20px;letter-spacing:2px;color:rgba(255,255,255,.28);margin-top:2px}
+#stars.on{color:#ffd23f;animation:bl .6s steps(2) infinite}
+@keyframes bl{50%{opacity:.55}}
+.barw{width:150px;height:9px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);border-radius:5px;overflow:hidden;margin-top:5px}
+#hp{height:100%;background:#e5484d;width:100%}
+#vinfo,#stock{font-size:13px;margin-top:5px;font-weight:600}
+#stock{color:#ffb86b}#sig{display:none;width:22px;height:22px;border-radius:50%;border:2px solid #111;box-shadow:0 0 8px rgba(0,0,0,.6);margin-top:6px;color:#111;font-weight:900;font-size:14px;line-height:19px;text-align:center;text-shadow:none}
+#tr{position:absolute;right:12px;top:10px;text-align:right}
+#mini{width:150px;height:150px;border-radius:12px;border:2px solid rgba(255,255,255,.75);background:#222;display:block;margin-left:auto}
+#street{font-size:13px;font-weight:700;margin-top:5px;max-width:220px;margin-left:auto}
+#clock{font-size:20px;opacity:.9}
+#obj{position:absolute;top:12px;left:50%;transform:translateX(-50%);max-width:min(56vw,640px);background:rgba(8,12,16,.72);border-left:4px solid #ffd23f;padding:8px 14px;border-radius:6px;font-size:15px;font-weight:600;display:none;text-align:center}
+#bar{position:absolute;top:62px;left:50%;transform:translateX(-50%);text-align:center;font-size:13px;font-weight:800;letter-spacing:.1em}
+#bar .barw{width:220px;margin:4px auto 0}#barf{height:100%;background:#ffd23f;width:0}
+#toast{position:absolute;bottom:128px;left:50%;transform:translateX(-50%);max-width:min(86vw,720px);background:rgba(8,12,16,.74);padding:8px 14px;border-radius:8px;font-size:15px;text-align:center;opacity:0;transition:opacity .35s}
+#prompt{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);background:rgba(255,210,63,.94);color:#151515;text-shadow:none;padding:7px 14px;border-radius:8px;font-size:15px;font-weight:800;display:none;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis}
+#banner{position:absolute;top:27%;left:0;right:0;text-align:center}
+#bt{font-size:clamp(44px,9vw,96px);line-height:1;text-shadow:0 4px 0 #000,0 0 24px rgba(0,0,0,.7)}
+#bs{font-size:clamp(15px,2.4vw,22px);font-weight:700;margin-top:6px}
+#dialog{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:min(92vw,760px);background:rgba(8,12,16,.9);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:14px 18px;pointer-events:auto;cursor:pointer}
+#dn{color:#ffd23f;font-size:22px}
+#dt{font-size:17px;line-height:1.4;margin-top:4px;text-shadow:none}
+#dh{font-size:12px;opacity:.6;text-align:right;margin-top:6px}
+#fps{position:absolute;left:12px;bottom:8px;font-size:11px;opacity:.6}
+#hurt{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 140px 30px rgba(220,20,20,.75);opacity:0}
+#fade{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .5s}
+#pbtn{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);pointer-events:auto;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;font-size:12px;padding:5px 12px}
+#touch{position:absolute;inset:0}
+#joy{position:absolute;left:22px;bottom:34px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px;border-radius:50%;background:rgba(255,255,255,.55)}
+#btns{position:absolute;right:14px;bottom:22px;display:grid;grid-template-columns:repeat(4,60px);gap:9px;pointer-events:auto}
+#btns button{height:60px;border-radius:50%;border:2px solid rgba(255,255,255,.45);background:rgba(10,14,18,.5);color:#fff;font-size:12px;font-weight:800;touch-action:none}
+#btns button.on{background:rgba(255,210,63,.75);color:#111}
+#btns .big{background:rgba(255,210,63,.35)}
+#bigmap{position:fixed;inset:0;width:100%;height:100%;background:#222}
+.ovl{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;background:linear-gradient(160deg,#1a2a1c 0%,#3a2a12 55%,#7a3b12 100%);overflow:auto;touch-action:pan-y;padding:16px}
+#pause{background:rgba(6,10,14,.82)}
+.card{width:min(94vw,720px);text-align:center;margin:auto}
+h1{font-size:clamp(44px,min(12vw,20vh),120px);margin:0;line-height:.9;color:#ffd23f;text-shadow:0 5px 0 #7a1f10}
+h2{font-size:clamp(22px,4vw,36px);margin:2px 0 14px;color:#fff;font-weight:400}
+.tag{opacity:.85;font-size:15px;margin:0 auto 18px;max-width:560px;line-height:1.45}
+.btn{display:block;width:min(100%,360px);margin:10px auto;padding:13px 18px;font-size:24px;border-radius:10px;border:0;background:#ffd23f;color:#1b1b1b;cursor:pointer}
+.btn.alt{background:#2e9b57;color:#fff}
+.btn.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5)}
+select{font-size:15px;padding:7px 10px;border-radius:8px;border:0;margin-left:6px}
+.help{margin:18px auto 0;font-size:13px;line-height:1.7;opacity:.9;text-align:left;max-width:560px;background:rgba(0,0,0,.3);padding:12px 16px;border-radius:10px}
+.help b{color:#ffd23f}
+@media (max-width:700px),(max-height:480px){#mini{width:112px;height:112px}#money{font-size:26px}#obj{font-size:13px;top:8px;max-width:46vw}#toast{bottom:auto;top:52px;font-size:13px;max-width:52vw}#bar{top:96px}#joy{bottom:22px;width:132px;height:132px}#tr{display:flex;flex-direction:column;align-items:flex-end}#clock{font-size:15px}#prompt{bottom:auto;top:calc(100% - 196px);left:50%;transform:translateX(-50%);font-size:13px;max-width:44vw;white-space:normal;text-align:center}#dialog{bottom:8px}#dt{font-size:15px}#pbtn{top:6px;bottom:auto}#street{font-size:11px;max-width:150px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud" class="hide">
+  <div id="tl"><div id="money" class="dsp">$0</div><div id="stars">☆☆☆☆☆</div><div class="barw"><div id="hp"></div></div><div id="vinfo"></div><div id="sig"></div><div id="stock"></div></div>
+  <div id="tr"><canvas id="mini" width="170" height="170"></canvas><div id="street"></div><div id="clock" class="dsp"></div></div>
+  <div id="obj"></div>
+  <div id="bar" class="hide"><span id="barl"></span><div class="barw"><div id="barf"></div></div></div>
+  <div id="toast"></div><div id="prompt"></div>
+  <div id="banner" class="hide"><div id="bt" class="dsp"></div><div id="bs"></div></div>
+  <div id="fps"></div>
+  <div id="touch" class="hide">
+    <div id="joy"><div id="knob"></div></div>
+    <div id="btns">
+      <button data-act="R">RADIO</button><button data-act="M">MAP</button><button data-act="H">HORN</button><button data-act="J">JOB</button>
+      <span></span><button data-act="HB">BRAKE</button><button data-act="E" class="big">ACT</button><button data-act="F" class="big">IN/OUT</button>
+    </div>
+  </div>
+  <button id="pbtn">❚❚ Pause</button>
+  <div id="dialog" class="hide"><div id="dn" class="dsp"></div><div id="dt"></div><div id="dh">E / Enter / tap to continue</div></div>
+</div>
+<div id="hurt"></div><div id="fade"></div>
+<canvas id="bigmap" class="hide"></canvas>
+<div id="pause" class="ovl hide"><div class="card">
+  <h2 class="dsp">Paused</h2>
+  <button id="resume" class="btn dsp">Resume</button>
+  <button id="abandon" class="btn ghost dsp">Abandon current mission</button>
+  <p>Graphics <select id="pq"><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option></select></p>
+</div></div>
+<div id="menu" class="ovl"><div class="card">
+  <h1 class="dsp">Sunshine City</h1>
+  <h2 class="dsp">Harare Hustle · starring Ngwere</h2>
+  <p class="tag">Play as Ngwere on the real street map of central Harare: drive kombis and mushikashika, sell at the musika, respect the robots and speed cameras (or pay), run ambulance calls, serve on national duty — and take down the tout boss taxing the whole city.</p>
+  <button id="cont" class="btn alt dsp hide">Continue</button>
+  <button id="play" class="btn dsp">New Game</button>
+  <p>Graphics <select id="q"><option value="low">Low (older phones)</option><option value="med">Medium</option><option value="high">High (PC)</option></select></p>
+  <div class="help">
+    <b>Keyboard</b> — W A S D / arrows: drive &amp; walk · Shift: run · Space: handbrake · F: enter / exit vehicle · E: action · J: start a job in a kombi, taxi, e-hailing car or mushikashika · H: horn · R: radio · M: map · P: pause<br>
+    <b>Touch</b> — left stick steers and accelerates; buttons on the right.<br>
+    <b>Earn</b> — story missions (yellow S) · vending: buy crates at Mbare Musika, sell at orange spots · fares · ZRP, Army, City Council and Ambulance duty (blue, green, teal, pink markers).<br>
+    <b>Rules</b> — robots (traffic lights) and speed cameras fine you: 60 km/h limit at cameras, stop on red. The coloured dot under your speed shows the next robot.<br>
+    <b>Street talk</b> — listen for ma hwindi: “Town here”, “Zviriko”, “Bho here”, “Madiii”, “Safe here”, “Usandifendera shaa!!”, “Vabereki hunzai mari dzekombi”, “NOP”, “Chitungwiza”, “Mabvuku-Tafara”.<br>
+    Zimbabwe drives on the <b>left</b>. Characters, artists and story events are fictional. Streets and building footprints: map data © OpenStreetMap contributors (ODbL).
+  </div>
+</div></div>
+<script>/*BUNDLE*/</script>
+</body>
+</html>

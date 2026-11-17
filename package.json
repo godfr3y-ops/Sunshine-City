@@ -1,0 +1,35 @@
+{
+  "name": "sunshine-city-harare-hustle",
+  "version": "1.0.0",
+  "description": "Sunshine City: Harare Hustle — open-world browser / mobile game starring Ngwere",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs && node tools/make-icons.mjs",
+    "build:web": "node build.mjs",
+    "icons": "node tools/make-icons.mjs",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:android": "npm run build && npx cap add android && npx cap sync android",
+    "cap:ios": "npm run build && npx cap add ios && npx cap sync ios",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios",
+    "test": "node --check src/phrases.js && node --check src/audio.js && node --check build.mjs"
+  },
+  "keywords": ["harare", "zimbabwe", "game", "threejs", "ngwere"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0",
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/godfr3y-ops/Sunshine-City.git"
+  }
+}
