@@ -15,7 +15,13 @@
     "open:ios": "npx cap open ios",
     "test": "node --check src/phrases.js && node --check src/audio.js && node --check build.mjs"
   },
-  "keywords": ["harare", "zimbabwe", "game", "threejs", "ngwere"],
+  "keywords": [
+    "harare",
+    "zimbabwe",
+    "game",
+    "threejs",
+    "ngwere"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

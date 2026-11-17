@@ -6,6 +6,12 @@ Branded icon lives in `resources/` (`icon-192.png`, `icon-512.png`, …).
 `npm run build` copies them into `dist/` (PWA + web zip).  
 CI runs `tools/ci/apply-native-icons.mjs` after Capacitor add so **Android APK** and **iOS IPA** home-screen icons are set before packaging.
 
+## App icon
+
+Branded icon lives in `resources/icon.png` (+ size variants).  
+`npm run build` copies PWA icons into `dist/`.  
+CI runs `node tools/ci/apply-native-icons.mjs` after `cap add` so **APK / Sideloadly IPA** show the Sunshine City home-screen icon.
+
 ## iOS — unsigned IPA + Sideloadly (your setup)
 
 CI builds a **real-device** IPA (`iphoneos` / arm64), left **unsigned**.  
